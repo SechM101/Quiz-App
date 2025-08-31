@@ -119,16 +119,25 @@ def get_questions(supabase: Client, category=None):
 def save_quiz_result(supabase: Client, user_id, quiz_data, score, answers):
     """Save quiz results to the database"""
     try:
+        # Ensure all data is JSON serializable
         result = {
             "user_id": user_id,
             "quiz_data": quiz_data,
-            "score": score,
+            "score": float(score),  # Ensure score is a number
             "answers": answers,
             "completed_at": datetime.now().isoformat()
         }
+        
+        # Debug: Log what we're trying to save
+        st.write(f"Debug: Saving result with user_id: {user_id}")
+        st.write(f"Debug: Quiz data type: {type(quiz_data)}")
+        st.write(f"Debug: Answers type: {type(answers)}")
+        
         supabase.table('quiz_results').insert(result).execute()
+        st.success("Quiz result saved successfully!")
     except Exception as e:
         st.error(f"Error saving quiz result: {e}")
+        st.write(f"Debug: Full error details: {str(e)}")
 
 # Authentication functions
 def sign_up(supabase: Client, email, password):
@@ -235,10 +244,21 @@ def submit_quiz():
     # Save results
     supabase = init_supabase()
     if st.session_state.user:
+        # Create a serializable copy of quiz data
+        quiz_data_for_db = {
+            "questions": questions,
+            "time_limit": st.session_state.current_quiz['time_limit'],
+            "start_time": st.session_state.current_quiz['start_time'].isoformat() if hasattr(st.session_state.current_quiz['start_time'], 'isoformat') else str(st.session_state.current_quiz['start_time'])
+        }
+        
+        # Debug: Check user ID type
+        user_id = st.session_state.user.id
+        st.write(f"Debug: User ID type: {type(user_id)}, Value: {user_id}")
+        
         save_quiz_result(
             supabase, 
-            st.session_state.user.id, 
-            st.session_state.current_quiz, 
+            user_id, 
+            quiz_data_for_db, 
             score, 
             st.session_state.quiz_answers
         )
