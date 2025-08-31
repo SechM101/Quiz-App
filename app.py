@@ -379,13 +379,24 @@ def main():
             
             for i, question in enumerate(questions):
                 question_id = str(question['id'])
-                user_answer = st.session_state.quiz_answers.get(question_id, 'No answer')
-                correct_answer = question['correct_answer']
-                is_correct = user_answer == correct_answer
+                user_answer_key = st.session_state.quiz_answers.get(question_id, 'No answer')
+                correct_answer_key = question['correct_answer']
+                is_correct = user_answer_key == correct_answer_key
+                
+                # Get the full answer text
+                options = {
+                    'a': question['option_a'],
+                    'b': question['option_b'],
+                    'c': question['option_c'],
+                    'd': question['option_d']
+                }
+                
+                user_answer_text = options.get(user_answer_key, 'No answer') if user_answer_key != 'No answer' else 'No answer'
+                correct_answer_text = options.get(correct_answer_key, 'Unknown')
                 
                 with st.expander(f"Question {i+1}: {question['question']}"):
-                    st.write(f"**Your answer:** {user_answer.upper()}")
-                    st.write(f"**Correct answer:** {correct_answer.upper()}")
+                    st.write(f"**Your answer:** {user_answer_text}")
+                    st.write(f"**Correct answer:** {correct_answer_text}")
                     st.write(f"**Explanation:** {question['explanation']}")
                     
                     if is_correct:
