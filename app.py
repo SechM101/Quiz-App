@@ -128,16 +128,10 @@ def save_quiz_result(supabase: Client, user_id, quiz_data, score, answers):
             "completed_at": datetime.now().isoformat()
         }
         
-        # Debug: Log what we're trying to save
-        st.write(f"Debug: Saving result with user_id: {user_id}")
-        st.write(f"Debug: Quiz data type: {type(quiz_data)}")
-        st.write(f"Debug: Answers type: {type(answers)}")
-        
         supabase.table('quiz_results').insert(result).execute()
         st.success("Quiz result saved successfully!")
     except Exception as e:
         st.error(f"Error saving quiz result: {e}")
-        st.write(f"Debug: Full error details: {str(e)}")
 
 # Authentication functions
 def sign_up(supabase: Client, email, password):
@@ -228,18 +222,12 @@ def display_quiz_timer():
 
 def submit_quiz():
     """Submit the quiz and mark as completed"""
-    st.write(f"Debug: Submitting quiz...")
-    st.write(f"Debug: Current quiz exists: {st.session_state.current_quiz is not None}")
-    st.write(f"Debug: Quiz answers: {st.session_state.quiz_answers}")
-    
     if not st.session_state.current_quiz or not st.session_state.quiz_answers:
         st.warning("No quiz to submit!")
         return
     
     questions = st.session_state.current_quiz['questions']
     score = calculate_score(questions, st.session_state.quiz_answers)
-    
-    st.write(f"Debug: Score calculated: {score}")
     
     # Save results
     supabase = init_supabase()
@@ -251,9 +239,7 @@ def submit_quiz():
             "start_time": st.session_state.current_quiz['start_time'].isoformat() if hasattr(st.session_state.current_quiz['start_time'], 'isoformat') else str(st.session_state.current_quiz['start_time'])
         }
         
-        # Debug: Check user ID type
         user_id = st.session_state.user.id
-        st.write(f"Debug: User ID type: {type(user_id)}, Value: {user_id}")
         
         save_quiz_result(
             supabase, 
@@ -265,7 +251,6 @@ def submit_quiz():
     
     # Mark quiz as completed - results will be displayed in main()
     st.session_state.quiz_completed = True
-    st.write(f"Debug: Quiz marked as completed")
     
 
 
@@ -354,9 +339,6 @@ def main():
     elif st.session_state.current_quiz and not st.session_state.quiz_completed:
         st.header("Quiz in Progress")
         
-        # Debug: Show current state
-        st.write(f"Debug: Quiz state - Current quiz: {st.session_state.current_quiz is not None}, Completed: {st.session_state.quiz_completed}")
-        
         # Display timer
         if not display_quiz_timer():
             return
@@ -391,9 +373,6 @@ def main():
             if answer:
                 st.session_state.quiz_answers[question_id] = answer
         
-        # Debug: Show current answers
-        st.write(f"Debug: Current answers: {st.session_state.quiz_answers}")
-        
         # Submit button
         if st.button("Submit Quiz"):
             submit_quiz()
@@ -403,53 +382,56 @@ def main():
     elif st.session_state.quiz_completed:
         st.header("Quiz Results")
         
-        # Debug information
-        st.write(f"Debug: Quiz completed = {st.session_state.quiz_completed}")
-        st.write(f"Debug: Current quiz exists = {st.session_state.current_quiz is not None}")
-        st.write(f"Debug: Quiz answers exist = {len(st.session_state.quiz_answers) if st.session_state.quiz_answers else 0}")
-        
-        # Display the quiz results that were calculated in submit_quiz()
-        if st.session_state.current_quiz and st.session_state.quiz_answers:
-            questions = st.session_state.current_quiz['questions']
-            score = calculate_score(questions, st.session_state.quiz_answers)
-            
-            st.success(f"Quiz completed! Your score: {score:.1f}%")
-            
-            # Show detailed results
-            st.subheader("Detailed Results")
-            
-            for i, question in enumerate(questions):
-                question_id = str(question['id'])
-                user_answer_key = st.session_state.quiz_answers.get(question_id, 'No answer')
-                correct_answer_key = question['correct_answer']
-                is_correct = user_answer_key == correct_answer_key
+        # Add a loading spinner for better UX
+        with st.spinner("Preparing your results..."):
+            # Display the quiz results that were calculated in submit_quiz()
+            if st.session_state.current_quiz and st.session_state.quiz_answers:
+                questions = st.session_state.current_quiz['questions']
+                score = calculate_score(questions, st.session_state.quiz_answers)
                 
-                # Get the full answer text
-                options = {
-                    'a': question['option_a'],
-                    'b': question['option_b'],
-                    'c': question['option_c'],
-                    'd': question['option_d']
-                }
+                st.success(f"Quiz completed! Your score: {score:.1f}%")
                 
-                user_answer_text = options.get(user_answer_key, 'No answer') if user_answer_key != 'No answer' else 'No answer'
-                correct_answer_text = options.get(correct_answer_key, 'Unknown')
+                # Show detailed results with optimized rendering
+                st.subheader("Detailed Results")
                 
-                with st.expander(f"Question {i+1}: {question['question']}"):
-                    st.write(f"**Your answer:** {user_answer_text}")
-                    st.write(f"**Correct answer:** {correct_answer_text}")
-                    st.write(f"**Explanation:** {question['explanation']}")
+                # Pre-calculate all options mapping for better performance
+                all_options = {}
+                for question in questions:
+                    question_id = str(question['id'])
+                    all_options[question_id] = {
+                        'a': question['option_a'],
+                        'b': question['option_b'],
+                        'c': question['option_c'],
+                        'd': question['option_d']
+                    }
+                
+                # Display results efficiently
+                for i, question in enumerate(questions):
+                    question_id = str(question['id'])
+                    user_answer_key = st.session_state.quiz_answers.get(question_id, 'No answer')
+                    correct_answer_key = question['correct_answer']
+                    is_correct = user_answer_key == correct_answer_key
                     
-                    if is_correct:
-                        st.success("✅ Correct!")
-                    else:
-                        st.error("❌ Incorrect!")
-        
-        if st.button("Take Another Quiz"):
-            st.session_state.current_quiz = None
-            st.session_state.quiz_answers = {}
-            st.session_state.quiz_completed = False
-            st.rerun()
+                    # Get the full answer text from pre-calculated options
+                    options = all_options[question_id]
+                    user_answer_text = options.get(user_answer_key, 'No answer') if user_answer_key != 'No answer' else 'No answer'
+                    correct_answer_text = options.get(correct_answer_key, 'Unknown')
+                    
+                    with st.expander(f"Question {i+1}: {question['question']}"):
+                        st.write(f"**Your answer:** {user_answer_text}")
+                        st.write(f"**Correct answer:** {correct_answer_text}")
+                        st.write(f"**Explanation:** {question['explanation']}")
+                        
+                        if is_correct:
+                            st.success("✅ Correct!")
+                        else:
+                            st.error("❌ Incorrect!")
+                
+                if st.button("Take Another Quiz"):
+                    st.session_state.current_quiz = None
+                    st.session_state.quiz_answers = {}
+                    st.session_state.quiz_completed = False
+                    st.rerun()
 
 if __name__ == "__main__":
     main()
