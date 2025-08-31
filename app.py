@@ -205,7 +205,6 @@ def display_quiz_timer():
         if remaining <= 0:
             st.error("Time's up! Quiz will be submitted automatically.")
             submit_quiz()
-            st.rerun()  # Rerun to show results
             return False
         
         minutes = int(remaining // 60)
@@ -220,12 +219,18 @@ def display_quiz_timer():
 
 def submit_quiz():
     """Submit the quiz and mark as completed"""
+    st.write(f"Debug: Submitting quiz...")
+    st.write(f"Debug: Current quiz exists: {st.session_state.current_quiz is not None}")
+    st.write(f"Debug: Quiz answers: {st.session_state.quiz_answers}")
+    
     if not st.session_state.current_quiz or not st.session_state.quiz_answers:
         st.warning("No quiz to submit!")
         return
     
     questions = st.session_state.current_quiz['questions']
     score = calculate_score(questions, st.session_state.quiz_answers)
+    
+    st.write(f"Debug: Score calculated: {score}")
     
     # Save results
     supabase = init_supabase()
@@ -240,6 +245,7 @@ def submit_quiz():
     
     # Mark quiz as completed - results will be displayed in main()
     st.session_state.quiz_completed = True
+    st.write(f"Debug: Quiz marked as completed")
     
 
 
@@ -328,6 +334,9 @@ def main():
     elif st.session_state.current_quiz and not st.session_state.quiz_completed:
         st.header("Quiz in Progress")
         
+        # Debug: Show current state
+        st.write(f"Debug: Quiz state - Current quiz: {st.session_state.current_quiz is not None}, Completed: {st.session_state.quiz_completed}")
+        
         # Display timer
         if not display_quiz_timer():
             return
@@ -347,25 +356,37 @@ def main():
             }
             
             question_id = str(question['id'])
+            
+            # Use a more reliable key format
+            radio_key = f"question_{i}_{question_id}"
+            
             answer = st.radio(
                 "Select your answer:",
                 options=list(options.keys()),
                 format_func=lambda x: f"{x.upper()}. {options[x]}",
-                key=f"q_{question_id}"
+                key=radio_key
             )
             
-            st.session_state.quiz_answers[question_id] = answer
+            # Store the answer immediately
+            if answer:
+                st.session_state.quiz_answers[question_id] = answer
+        
+        # Debug: Show current answers
+        st.write(f"Debug: Current answers: {st.session_state.quiz_answers}")
         
         # Submit button
         if st.button("Submit Quiz"):
             submit_quiz()
-            st.rerun()  # Rerun to show results
+            # Don't rerun here - let the state change naturally
     
     # Quiz results
     elif st.session_state.quiz_completed:
         st.header("Quiz Results")
         
-        
+        # Debug information
+        st.write(f"Debug: Quiz completed = {st.session_state.quiz_completed}")
+        st.write(f"Debug: Current quiz exists = {st.session_state.current_quiz is not None}")
+        st.write(f"Debug: Quiz answers exist = {len(st.session_state.quiz_answers) if st.session_state.quiz_answers else 0}")
         
         # Display the quiz results that were calculated in submit_quiz()
         if st.session_state.current_quiz and st.session_state.quiz_answers:
