@@ -205,6 +205,7 @@ def display_quiz_timer():
         if remaining <= 0:
             st.error("Time's up! Quiz will be submitted automatically.")
             submit_quiz()
+            st.rerun()  # Rerun to show results
             return False
         
         minutes = int(remaining // 60)
@@ -218,7 +219,7 @@ def display_quiz_timer():
     return False
 
 def submit_quiz():
-    """Submit the quiz and show results"""
+    """Submit the quiz and mark as completed"""
     if not st.session_state.current_quiz or not st.session_state.quiz_answers:
         st.warning("No quiz to submit!")
         return
@@ -237,28 +238,10 @@ def submit_quiz():
             st.session_state.quiz_answers
         )
     
-    # Display results
+    # Mark quiz as completed - results will be displayed in main()
     st.session_state.quiz_completed = True
-    st.success(f"Quiz completed! Your score: {score:.1f}%")
     
-    # Show detailed results
-    st.subheader("Quiz Results")
-    
-    for i, question in enumerate(questions):
-        question_id = str(question['id'])
-        user_answer = st.session_state.quiz_answers.get(question_id, 'No answer')
-        correct_answer = question['correct_answer']
-        is_correct = user_answer == correct_answer
-        
-        with st.expander(f"Question {i+1}: {question['question']}"):
-            st.write(f"**Your answer:** {user_answer.upper()}")
-            st.write(f"**Correct answer:** {correct_answer.upper()}")
-            st.write(f"**Explanation:** {question['explanation']}")
-            
-            if is_correct:
-                st.success("✅ Correct!")
-            else:
-                st.error("❌ Incorrect!")
+
 
 # Main application
 def main():
@@ -309,7 +292,7 @@ def main():
                 sign_out(supabase)
             
             # Admin section
-            if st.session_state.user.email == os.getenv("ADMIN_EMAIL", "admin@example.com"):
+            if st.session_state.user.email == os.getenv("ADMIN_EMAIL"):
                 # Import and render enhanced admin panel
                 from admin_panel import render_admin_panel
                 render_admin_panel(supabase, st.session_state.user.email)
@@ -376,11 +359,39 @@ def main():
         # Submit button
         if st.button("Submit Quiz"):
             submit_quiz()
-            st.rerun()
+            st.rerun()  # Rerun to show results
     
     # Quiz results
     elif st.session_state.quiz_completed:
         st.header("Quiz Results")
+        
+        
+        
+        # Display the quiz results that were calculated in submit_quiz()
+        if st.session_state.current_quiz and st.session_state.quiz_answers:
+            questions = st.session_state.current_quiz['questions']
+            score = calculate_score(questions, st.session_state.quiz_answers)
+            
+            st.success(f"Quiz completed! Your score: {score:.1f}%")
+            
+            # Show detailed results
+            st.subheader("Detailed Results")
+            
+            for i, question in enumerate(questions):
+                question_id = str(question['id'])
+                user_answer = st.session_state.quiz_answers.get(question_id, 'No answer')
+                correct_answer = question['correct_answer']
+                is_correct = user_answer == correct_answer
+                
+                with st.expander(f"Question {i+1}: {question['question']}"):
+                    st.write(f"**Your answer:** {user_answer.upper()}")
+                    st.write(f"**Correct answer:** {correct_answer.upper()}")
+                    st.write(f"**Explanation:** {question['explanation']}")
+                    
+                    if is_correct:
+                        st.success("✅ Correct!")
+                    else:
+                        st.error("❌ Incorrect!")
         
         if st.button("Take Another Quiz"):
             st.session_state.current_quiz = None
